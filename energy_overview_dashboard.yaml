@@ -1,0 +1,570 @@
+views:
+  - title: Live Energy
+    path: live-energy
+    icon: mdi:lightning-bolt
+    layout:
+      type: masonry
+    cards:
+      - type: vertical-stack
+        cards:
+          - type: custom:mushroom-title-card
+            title: Master Controls
+          - type: custom:mushroom-entity-card
+            entity: input_boolean.rules_active
+            name: Enable Rules (Auto Mode)
+            icon: mdi:robot
+            icon_color: >-
+              {{ 'green' if is_state('input_boolean.rules_active','on') else
+              'red' }}
+            tap_action:
+              action: toggle
+          - type: custom:mushroom-entity-card
+            entity: input_boolean.master_override_self_consumption
+            name: Self Consumption Override
+            icon: mdi:shield-lock
+            icon_color: >-
+              {{ 'red' if
+              is_state('input_boolean.master_override_self_consumption','on')
+              else 'green' }}
+            tap_action:
+              action: toggle
+          - type: custom:mushroom-entity-card
+            entity: input_boolean.ev_priority_solar_active
+            name: Solar Tracking Status
+            icon: mdi:solar-power
+            icon_color: >-
+              {{ 'amber' if
+              is_state('input_boolean.ev_priority_solar_active','on') else
+              'grey' }}
+            tap_action:
+              action: none
+          - type: tile
+            entity: input_select.system_state
+            name: System State
+            icon: mdi:state-machine
+          - type: tile
+            entity: input_number.battery_reserve_soc
+            name: Battery Reserve SoC (%)
+            icon: mdi:battery-sync
+      - type: custom:mushroom-title-card
+        title: Live Power
+        subtitle: What's happening right now
+      - type: custom:power-flow-card-plus
+        name: Live Power Flow
+        display_zero_lines: true
+        entities:
+          grid:
+            entity: sensor.grid_power_corrected
+            invert_state: false
+          solar:
+            entity: sensor.total_pv_power_w
+          battery:
+            entity: sensor.ss_battery_power
+          home:
+            entity: sensor.total_house_power_ss_inverter
+            override_state: true
+            subtract_individual: true
+          individual:
+            - entity: sensor.ev_charger_power
+              name: EV Charger
+              icon: mdi:ev-station
+              display_zero: true
+            - entity: sensor.kitchen_circuit_power
+              name: Kitchen
+              icon: mdi:silverware-fork-knife
+              display_zero: true
+            - entity: sensor.hot_water_power_fixed
+              name: Hot Water
+              icon: mdi:water-boiler
+              display_zero: true
+            - entity: sensor.rest_of_house_power_fixed
+              name: Other Loads
+              icon: mdi:dots-horizontal-circle
+              display_zero: true
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: custom:mushroom-entity-card
+            entity: sensor.total_pv_power_formatted
+            name: Solar Production
+            icon_color: yellow
+            layout: horizontal
+          - type: custom:mushroom-template-card
+            primary: House Load
+            secondary: >
+              {% set power = states('sensor.total_house_power_ss_inverter') |
+              float(0) %}
+
+              {% if power >= 500 %}
+                {{ (power / 1000) | round(2) }} kW
+              {% else %}
+                {{ power | round(0) }} W
+              {% endif %}
+            icon: mdi:home-lightning-bolt
+            entity: sensor.total_house_power_ss_inverter
+            icon_color: blue
+            layout: horizontal
+          - type: custom:mushroom-template-card
+            primary: Grid Power
+            secondary: |
+              {% set power = states('sensor.grid_power_corrected') | float(0) %}
+              {% if power >= 500 or power <= -500 %}
+                {{ (power / 1000) | round(2) }} kW
+              {% else %}
+                {{ power | round(0) }} W
+              {% endif %}
+            icon: mdi:transmission-tower
+            entity: sensor.grid_power_corrected
+            icon_color: red
+            layout: horizontal
+          - type: custom:mushroom-template-card
+            entity: sensor.ss_battery_power
+            primary: Battery Power
+            secondary: |
+              {% set power = states('sensor.ss_battery_power') | float(0) %}
+              {% if power >= 500 or power <= -500 %}
+                {{ (power / 1000) | round(2) }} kW
+              {% else %}
+                {{ power | round(0) }} W
+              {% endif %}
+            icon: |
+              {% set power = states(entity) | float(0) %}
+              {% if power > 0 %}
+                mdi:battery-arrow-down
+              {% elif power < 0 %}
+                mdi:battery-arrow-up
+              {% else %}
+                mdi:battery
+              {% endif %}
+            icon_color: |
+              {% set power = states(entity) | float(0) %}
+              {% if power > 0 %}
+                orange
+              {% elif power < 0 %}
+                green
+              {% else %}
+                grey
+              {% endif %}
+            layout: horizontal
+      - type: custom:mushroom-title-card
+        title: Home Battery
+      - type: grid
+        columns: 3
+        square: false
+        cards:
+          - type: custom:mushroom-entity-card
+            entity: sensor.ss_battery_soc
+            name: Battery SoC
+            icon_color: green
+          - type: custom:mushroom-entity-card
+            entity: sensor.home_battery_kwh_remaining
+            name: kWh Left
+            icon_color: blue
+          - type: custom:mushroom-entity-card
+            entity: sensor.home_battery_kwh_to_full
+            name: kWh to Full
+            icon_color: cyan
+      - type: custom:mushroom-title-card
+        title: Polestar 2
+      - type: vertical-stack
+        cards:
+          - type: custom:mushroom-select-card
+            entity: input_select.polestar_charge_limit
+            name: Target Charge Limit (%)
+            icon: mdi:ev-station
+            layout: horizontal
+          - type: grid
+            columns: 3
+            square: false
+            cards:
+              - type: custom:mushroom-entity-card
+                entity: sensor.polestar_0632_battery_charge_level_2
+                name: Battery SoC
+                icon_color: blue
+              - type: custom:mushroom-entity-card
+                entity: sensor.polestar_kwh_remaining
+                name: kWh Left
+                icon_color: blue
+              - type: custom:mushroom-template-card
+                primary: Est. Range
+                secondary: >
+                  {{ states('sensor.polestar_0632_estimated_range') | float(0) |
+                  round(0) }} km
+                icon: mdi:map-marker-distance
+                entity: sensor.polestar_0632_estimated_range
+                icon_color: blue
+              - type: custom:mushroom-template-card
+                primary: |
+                  {% if states('sensor.ev_charger_power') | float(0) > 20 %}
+                    Live Charge Rate
+                  {% else %}
+                    Charger Standby
+                  {% endif %}
+                secondary: |
+                  {% set power = states('sensor.ev_charger_power') | float(0) %}
+                  {% if power >= 500 %}
+                    {{ (power / 1000) | round(2) }} kW
+                  {% else %}
+                    {{ power | round(0) }} W
+                  {% endif %}
+                icon: |
+                  {% if states('sensor.ev_charger_power') | float(0) > 20 %}
+                    mdi:ev-plug-fast
+                  {% else %}
+                    mdi:ev-plug-outline
+                  {% endif %}
+                entity: sensor.ev_charger_power
+                icon_color: cyan
+              - type: custom:mushroom-entity-card
+                entity: sensor.polestar_kwh_to_limit
+                name: kWh to Target
+                icon_color: green
+              - type: custom:mushroom-entity-card
+                entity: sensor.polestar_0632_charging_status_2
+                name: Charging Status
+                icon_color: grey
+      - type: custom:mushroom-title-card
+        title: Amber Electric
+        subtitle: Live Pricing & Renewables
+      - type: grid
+        columns: 3
+        square: false
+        cards:
+          - type: custom:mushroom-entity-card
+            entity: sensor.amber_general_price
+            name: Grid Price
+            icon: mdi:currency-usd
+            icon_color: orange
+          - type: custom:mushroom-entity-card
+            entity: sensor.amber_general_price_descriptor
+            name: Price Status
+            icon: mdi:tag-text-outline
+            icon_color: blue
+          - type: custom:mushroom-entity-card
+            entity: sensor.amber_general_forecast
+            name: Price Forecast
+            icon: mdi:chart-bell-curve
+            icon_color: purple
+          - type: custom:mushroom-entity-card
+            entity: sensor.the_cullens_feed_in_price
+            name: Feed In Price
+            icon: mdi:solar-power
+            icon_color: yellow
+          - type: custom:mushroom-entity-card
+            entity: sensor.the_cullens_feed_in_price_descriptor
+            name: Feed In Status
+            icon: mdi:tag-text-outline
+            icon_color: blue
+          - type: custom:mushroom-entity-card
+            entity: sensor.the_cullens_feed_in_forecast
+            name: Feed In Forecast
+            icon: mdi:chart-bell-curve
+            icon_color: purple
+          - type: custom:mushroom-entity-card
+            entity: sensor.amber_renewables
+            name: Renewables
+            icon: mdi:leaf
+            icon_color: green
+          - type: custom:mushroom-entity-card
+            entity: binary_sensor.amber_price_spike
+            name: Price Spike
+            icon: mdi:alert-decagram
+            icon_color: red
+          - type: custom:mushroom-entity-card
+            entity: binary_sensor.amber_demand_window
+            name: Demand Window
+            icon: mdi:clock-alert
+            icon_color: deep-orange
+      - type: custom:mushroom-title-card
+        title: Recent Power History
+      - type: custom:plotly-graph
+        hours_to_show: 6
+        layout:
+          height: 350
+          dragmode: pan
+          margin:
+            r: 50
+            t: 30
+          xaxis:
+            rangeselector:
+              buttons:
+                - count: 1
+                  label: 1h
+                  step: hour
+                - count: 3
+                  label: 3h
+                  step: hour
+                - count: 6
+                  label: 6h
+                  step: hour
+          yaxis:
+            fixedrange: false
+        entities:
+          - entity: sensor.total_pv_power_w
+            name: Solar
+            line:
+              color: '#f1c40f'
+              width: 2
+          - entity: sensor.inverter_output_power
+            name: House Load
+            line:
+              color: '#3498db'
+              width: 2
+          - entity: sensor.grid_power_corrected
+            name: Grid
+            line:
+              color: '#e74c3c'
+              width: 2
+          - entity: sensor.ss_battery_power
+            name: Battery
+            line:
+              color: '#2ecc71'
+              width: 2
+      - type: custom:mushroom-title-card
+        title: Kill Switch Exclusions
+        subtitle: Prevent fans from turning off with the main switch
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: custom:mushroom-entity-card
+            entity: input_boolean.exclude_lounge_fan
+            name: Exclude Lounge Fan
+            icon_color: deep-purple
+            layout: horizontal
+            tap_action:
+              action: toggle
+          - type: custom:mushroom-entity-card
+            entity: input_boolean.exclude_dining_fan
+            name: Exclude Dining Fan
+            icon_color: deep-purple
+            layout: horizontal
+            tap_action:
+              action: toggle
+  - title: Cumulative Power
+    path: cumulative-power
+    icon: mdi:chart-line
+    cards:
+      - type: custom:mushroom-title-card
+        title: Energy History (Last 7 Days)
+        subtitle: Based on your kWh sensors
+      - type: history-graph
+        title: Grid Energy (kWh)
+        hours_to_show: 168
+        entities:
+          - entity: sensor.grid_energy_import_kwh
+            name: Grid Import
+          - entity: sensor.grid_energy_export_kwh
+            name: Grid Export
+      - type: history-graph
+        title: Solar & Battery Energy (kWh)
+        hours_to_show: 168
+        entities:
+          - entity: sensor.solar_energy_production_kwh
+            name: Solar Production
+          - entity: sensor.battery_energy_charge_kwh
+            name: Battery Charge
+          - entity: sensor.battery_energy_discharge_kwh
+            name: Battery Discharge
+      - type: history-graph
+        title: Device Energy (kWh)
+        hours_to_show: 168
+        entities:
+          - entity: sensor.ev_charger_energy_kwh
+            name: EV Charger
+          - entity: sensor.kitchen_energy_kwh
+            name: Kitchen
+          - entity: sensor.hot_water_energy_kwh
+            name: Hot Water
+          - entity: sensor.other_loads_energy_kwh
+            name: Other Loads
+  - title: Inverter Settings
+    path: inverter-settings
+    icon: mdi:cog
+    cards:
+      - type: entities
+        entities:
+          - entity: number.sunsynk_battery_low_capacity
+            name: Battery low capacity
+          - entity: number.sunsynk_battery_shutdown_capacity
+            name: Battery shutdown capacity
+          - entity: switch.ss_grid_charge_enabled
+            name: Grid charge enabled
+          - entity: select.ss_load_limit
+            name: Load Limit
+          - entity: switch.ss_priority_load
+            name: Priority Load
+          - entity: number.ss_prog1_capacity
+            name: Prog1 Capacity
+          - entity: select.ss_prog1_charge
+            name: Prog1 charge
+          - entity: number.ss_prog1_power
+            name: Prog1 power
+          - entity: select.ss_prog1_time
+            name: Prog1 Time
+          - entity: number.ss_prog2_capacity
+            name: Prog2 Capacity
+          - entity: select.ss_prog2_charge
+            name: Prog2 charge
+          - entity: number.ss_prog2_power
+            name: Prog2 power
+          - entity: select.ss_prog2_time
+            name: Prog2 Time
+          - entity: number.ss_prog3_capacity
+            name: Prog3 Capacity
+          - entity: select.ss_prog3_charge
+            name: Prog3 charge
+          - entity: number.ss_prog3_power
+            name: Prog3 power
+          - entity: select.ss_prog3_time
+            name: Prog3 Time
+          - entity: number.ss_prog4_capacity
+            name: Prog4 Capacity
+          - entity: select.ss_prog4_charge
+            name: Prog4 charge
+          - entity: number.ss_prog4_power
+            name: Prog4 power
+          - entity: select.ss_prog4_time
+            name: Prog4 Time
+          - entity: number.ss_prog5_capacity
+            name: Prog5 Capacity
+          - entity: select.ss_prog5_charge
+            name: Prog5 charge
+          - entity: number.ss_prog5_power
+            name: Prog5 power
+          - entity: select.ss_prog5_time
+            name: Prog5 Time
+          - entity: number.ss_prog6_capacity
+            name: Prog6 Capacity
+          - entity: select.ss_prog6_charge
+            name: Prog6 charge
+          - entity: number.ss_prog6_power
+            name: Prog6 power
+          - entity: select.ss_prog6_time
+            name: Prog6 Time
+          - entity: switch.ss_solar_export
+            name: Solar Export
+          - entity: switch.ss_use_timer
+            name: Use Timer
+        title: Deye SUN-10K
+  - title: Amber
+    path: amber
+    icon: mdi:flash
+    cards:
+      - type: vertical-stack
+        cards:
+          - type: custom:mushroom-title-card
+            title: Amber Price Analytics
+            subtitle: History & Future Forecast
+          - type: custom:apexcharts-card
+            graph_span: 48h
+            span:
+              start: hour
+              offset: '-24h'
+            now:
+              show: true
+              label: Now
+            header:
+              show: true
+              title: Buy/Sell Pricing Overlay
+              show_states: true
+              colorize_states: true
+            yaxis:
+              - id: price
+                decimals: 2
+                apex_config:
+                  title:
+                    text: $/kWh
+            series:
+              - entity: sensor.amber_general_price
+                name: Buy Price
+                type: area
+                curve: stepline
+                color: '#e74c3c'
+                extend_to: now
+              - entity: sensor.amber_general_forecast
+                name: Buy Forecast
+                type: area
+                curve: stepline
+                color: '#e74c3c'
+                show:
+                  in_header: false
+                data_generator: |
+                  return entity.attributes.forecasts.map((entry) => {
+                    return [new Date(entry.start_time).getTime(), entry.per_kwh];
+                  });
+              - entity: sensor.the_cullens_feed_in_price
+                name: Sell Price (FiT)
+                type: line
+                curve: stepline
+                color: '#f1c40f'
+                extend_to: now
+              - entity: sensor.the_cullens_feed_in_forecast
+                name: Sell Forecast
+                type: line
+                curve: stepline
+                color: '#f1c40f'
+                show:
+                  in_header: false
+                data_generator: |
+                  return entity.attributes.forecasts.map((entry) => {
+                    return [new Date(entry.start_time).getTime(), entry.per_kwh];
+                  });
+          - type: custom:plotly-graph
+            hours_to_show: 48
+            time_offset: 24h
+            layout:
+              height: 350
+              dragmode: pan
+              margin:
+                r: 50
+              xaxis:
+                rangeselector:
+                  buttons:
+                    - count: 12
+                      label: 12h
+                      step: hour
+                    - count: 24
+                      label: 24h
+                      step: hour
+                    - count: 48
+                      label: 48h
+                      step: hour
+            entities:
+              - entity: sensor.amber_general_price
+                name: Buy History
+                line:
+                  color: '#e74c3c'
+                  shape: hv
+              - entity: sensor.amber_general_forecast
+                name: Buy Forecast
+                show_value: false
+                line:
+                  color: '#e74c3c'
+                  dash: dot
+                  shape: hv
+                filters:
+                  - fn: |-
+                      ({meta}) => ({
+                        xs: meta.forecasts.map(({ start_time }) => new Date(start_time)),
+                        ys: meta.forecasts.map(({ per_kwh }) => per_kwh),
+                      })
+              - entity: sensor.the_cullens_feed_in_price
+                name: Sell History
+                line:
+                  color: '#f1c40f'
+                  shape: hv
+              - entity: sensor.the_cullens_feed_in_forecast
+                name: Sell Forecast
+                show_value: false
+                line:
+                  color: '#f1c40f'
+                  dash: dot
+                  shape: hv
+                filters:
+                  - fn: |-
+                      ({meta}) => ({
+                        xs: meta.forecasts.map(({ start_time }) => new Date(start_time)),
+                        ys: meta.forecasts.map(({ per_kwh }) => per_kwh),
+                      })
