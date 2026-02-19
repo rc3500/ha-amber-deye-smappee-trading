@@ -2,11 +2,12 @@
 
 A comprehensive, closed-loop Home Assistant energy trading and smart charging system. 
 
-This package was custom-built to orchestrate wholesale energy trading (Amber Electric Australia) with a Deye hybrid inverter, a large home battery (61.44kWh), and a Smappee EV charger (charging a Polestar 2). It solves the complex issue of DC-coupled solar curtailment when smart-charging an EV, and provides a highly user-friendly dashboard for daily control.
+This package was custom-built to orchestrate wholesale energy trading (Amber Electric Australia) with a Deye hybrid inverter, a home battery, and a Smappee EV charger. It solves the complex issue of DC-coupled solar curtailment when smart-charging an EV, and provides a highly user-friendly dashboard for daily control.
 
 ## Hardware & Integrations Used
 * **Energy Provider:** Amber Electric (Wholesale real-time pricing)
-* **Inverter:** Deye Hybrid Inverter
+* **Inverter:** Deye Hybrid Inverter - SUN-10K-SG04LP3-AU
+* **Battery:** AI-W5.1-B x12 (61.44kWh)
 * **Inverter Connection:** [Waveshare RS485 TO WIFI/ETH](https://www.waveshare.com/wiki/RS485_TO_WIFI/ETH) adapter (for fast, local Modbus control)
 * **EV Charger:** Smappee EV Wallbox
 * **Dashboard:** Custom Lovelace UI (Mushroom, Power Flow Plus, Plotly, ApexCharts)
