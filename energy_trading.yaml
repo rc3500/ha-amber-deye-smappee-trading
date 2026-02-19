@@ -1,1 +1,795 @@
+# /config/packages/energy_trading.yaml
+# ==============================================================================
+# 1. SETTINGS & INPUTS
+# ==============================================================================
+input_number:
+  battery_export_reserve_kwh:
+    name: Min Battery Reserve
+    min: 0
+    max: 15
+    step: 0.5
+    mode: slider
+    unit_of_measurement: "kWh"
+    initial: 2.0
+  tariff_cost_peak:
+    min: 0
+    max: 100
+    mode: box
+    initial: 19.0
+  tariff_cost_shoulder:
+    min: 0
+    max: 100
+    mode: box
+    initial: 5.0
+  tariff_cost_offpeak:
+    min: 0
+    max: 100
+    mode: box
+    initial: 0.0
+  load_threshold_1:
+    name: "Zone 1 Ceiling (¢/kWh)"
+    min: -20
+    max: 100
+    step: 0.5
+    mode: slider
+    initial: 0.0
+  load_threshold_2:
+    name: "Zone 2 Ceiling (¢/kWh)"
+    min: -20
+    max: 100
+    step: 0.5
+    mode: slider
+    initial: 10.0
+  load_threshold_3:
+    name: "Zone 3 Ceiling (¢/kWh)"
+    min: -20
+    max: 100
+    step: 0.5
+    mode: slider
+    initial: 25.0
+  load_threshold_4:
+    name: "Zone 4 Ceiling (¢/kWh)"
+    min: -20
+    max: 200
+    step: 1
+    mode: slider
+    initial: 40.0
+  gen_threshold_1:
+    name: "Zone 1 Ceiling (¢/kWh)"
+    min: -20
+    max: 100
+    step: 0.5
+    mode: slider
+    initial: 0.0
+  gen_threshold_2:
+    name: "Zone 2 Ceiling (¢/kWh)"
+    min: -20
+    max: 100
+    step: 0.5
+    mode: slider
+    initial: 5.0
+  gen_threshold_3:
+    name: "Zone 3 Ceiling (¢/kWh)"
+    min: -20
+    max: 100
+    step: 0.5
+    mode: slider
+    initial: 12.0
+  gen_threshold_4:
+    name: "Zone 4 Ceiling (¢/kWh)"
+    min: -20
+    max: 200
+    step: 1
+    mode: slider
+    initial: 20.0
 
+  # --- TIERED AUTO TRADING INPUTS ---
+  auto_dump_fit_threshold_tier1:
+    name: Tier 1 - Dump FiT ($)
+    min: 0.00
+    max: 0.50
+    step: 0.01
+    mode: slider
+    icon: mdi:cash
+  auto_dump_min_soc_tier1:
+    name: Tier 1 - Dump Min SoC (%)
+    min: 0
+    max: 100
+    step: 1
+    mode: slider
+    icon: mdi:battery-arrow-down
+    
+  auto_dump_fit_threshold_tier2:
+    name: Tier 2 - Dump FiT ($)
+    min: 0.00
+    max: 1.00
+    step: 0.02
+    mode: slider
+    icon: mdi:cash-multiple
+  auto_dump_min_soc_tier2:
+    name: Tier 2 - Dump Min SoC (%)
+    min: 0
+    max: 100
+    step: 1
+    mode: slider
+    icon: mdi:battery-arrow-down
+    
+  auto_dump_fit_threshold_tier3:
+    name: Tier 3 - Dump FiT ($)
+    min: 0.00
+    max: 5.00
+    step: 0.05
+    mode: slider
+    icon: mdi:cash-fast
+  auto_dump_min_soc_tier3:
+    name: Tier 3 - Dump Min SoC (%)
+    min: 0
+    max: 100
+    step: 1
+    mode: slider
+    icon: mdi:battery-arrow-down
+
+# ==============================================================================
+# 2. SWITCHES & MODES
+# ==============================================================================
+input_boolean:
+  rules_active:
+    name: "Enable Rules (Auto Mode)"
+    icon: mdi:robot
+    initial: on
+  auto_zero_export_negative_fit:
+    name: "Auto Mode - Zero Export on Negative FiT"
+    icon: mdi:solar-panel-large
+  auto_grid_charge_negative_buy:
+    name: "Auto Mode - Grid Charge on Negative Buy Price"
+    icon: mdi:battery-charging-100
+
+input_select:
+  system_state:
+    name: System State
+    options:
+      - "Auto Mode"
+      - "2: Excess Solar to Grid"
+      - "3: Max Export (Dump)"
+      - "4: Self Consumption"
+      - "5: Grid Charge (Force)"
+    initial: "Auto Mode"
+    
+  ev_charging_mode:
+    name: EV Charging Mode
+    options:
+      - "Excess Solar Only"
+      - "Full Speed (Protect Battery)"
+      - "Standard Charge"
+    initial: "Excess Solar Only"
+    icon: mdi:ev-station
+
+# ==============================================================================
+# 3. SENSORS & CALCULATIONS
+# ==============================================================================
+input_datetime:
+  peak_start:
+    has_time: true
+    initial: "16:00:00"
+  peak_end:
+    has_time: true
+    initial: "21:00:00"
+  offpeak_start:
+    has_time: true
+    initial: "11:00:00"
+  offpeak_end:
+    has_time: true
+    initial: "16:00:00"
+
+template:
+  - sensor:
+      - name: "Current Battery SoC"
+        unique_id: current_battery_soc
+        unit_of_measurement: "%"
+        state: >
+          {% set remaining = states('sensor.home_battery_kwh_remaining') | float(0) %}
+          {% set total = 61.44 %}
+          {{ (remaining / total * 100) | round(0) }}
+          
+      - name: "Solar Available for EV"
+        unit_of_measurement: "W"
+        state: >
+          {% set ev_power = states('sensor.smappee_ev_5130018050_connector_1_power') | float(0) %}
+          {% set grid_power = states('sensor.grid_power_corrected') | float(0) %}
+          {% set batt_power = states('sensor.ss_battery_power') | float(0) %}
+          {# Negative Grid = Export. Negative Batt = Charging #}
+          {% set net_surplus = (-1 * grid_power) - (batt_power * 0.96) %}
+          {# Buffer of 200W left on the table for inverter lag #}
+          {{ [0, (ev_power + net_surplus - 200)] | max | round(0) }}
+          
+      - name: "Max EV Amps"
+        unit_of_measurement: "A"
+        state: >
+          {% set total_load = states('sensor.ss_total_load_power') | float(0) %}
+          {% set ev_power = states('sensor.smappee_ev_5130018050_connector_1_power') | float(0) %}
+          {% set house_power = [0, (total_load - ev_power)] | max %}
+          {% set max_ev_watts = 9500 - house_power %}
+          {% set max_amps = (max_ev_watts / 235) | int %}
+          {{ [max_amps, 32] | min | max(0) }}
+          
+      - name: "Calculated EV Amps"
+        unit_of_measurement: "A"
+        state: >
+          {% set watts = states('sensor.solar_available_for_ev') | float(0) %}
+          {% set target_amps = (watts / 235) | int %}
+          {% set max_amps = states('sensor.max_ev_amps') | int(32) %}
+          {% if target_amps < 6 %} 0
+          {% elif target_amps > max_amps %} {{ max_amps }}
+          {% else %} {{ target_amps }}
+          {% endif %}
+          
+      - name: "Current Network Tariff"
+        state: >
+          {% set t = now().time() %}
+          {% set peak_s = states('input_datetime.peak_start') | as_timestamp | timestamp_custom('%H:%M:%S') %}
+          {% set peak_e = states('input_datetime.peak_end') | as_timestamp | timestamp_custom('%H:%M:%S') %}
+          {% set off_s = states('input_datetime.offpeak_start') | as_timestamp | timestamp_custom('%H:%M:%S') %}
+          {% set off_e = states('input_datetime.offpeak_end') | as_timestamp | timestamp_custom('%H:%M:%S') %}
+          {% if peak_s <= str(t) < peak_e %} {{ states('input_number.tariff_cost_peak') | float(0) }}
+          {% elif off_s <= str(t) < off_e %} {{ states('input_number.tariff_cost_offpeak') | float(0) }}
+          {% else %} {{ states('input_number.tariff_cost_shoulder') | float(0) }}
+          {% endif %}
+          
+      - name: "Real Buy Price"
+        state: >
+          {% set spot = states('sensor.amber_general_price') | float(0) %}
+          {% set tariff = states('sensor.current_network_tariff') | float(0) %}
+          {% if spot < 0 %} {{ spot }}
+          {% else %} {{ (spot + tariff) | round(2) }}
+          {% endif %}
+          
+      - name: "Current Load Zone"
+        state: >
+          {% set price = states('sensor.real_buy_price') | float(-999) %}
+          {% if price < states('input_number.load_threshold_1')|float(0) %} 1
+          {% elif price < states('input_number.load_threshold_2')|float(0) %} 2
+          {% elif price < states('input_number.load_threshold_3')|float(0) %} 3
+          {% elif price < states('input_number.load_threshold_4')|float(0) %} 4
+          {% else %} 5
+          {% endif %}
+          
+      - name: "Current Gen Zone"
+        state: >
+          {% set price = states('sensor.the_cullens_feed_in_price') | float(-999) %}
+          {% set batt_kwh = states('sensor.home_battery_kwh_remaining') | float(0) %}
+          {% if batt_kwh < states('input_number.battery_export_reserve_kwh')|float(0) %} 1
+          {% elif price < states('input_number.gen_threshold_1')|float(0) %} 1
+          {% elif price < states('input_number.gen_threshold_2')|float(0) %} 2
+          {% elif price < states('input_number.gen_threshold_3')|float(0) %} 3
+          {% elif price < states('input_number.gen_threshold_4')|float(0) %} 4
+          {% else %} 5
+          {% endif %}
+
+# ==============================================================================
+# 4. AUTOMATIONS
+# ==============================================================================
+automation:
+  - alias: "Price Based Export Control"
+    trigger:
+      - platform: state
+        entity_id: sensor.the_cullens_feed_in_price
+    action:
+      - choose:
+          - conditions: "{{ states('sensor.the_cullens_feed_in_price') | float(999) <= 0 }}"
+            sequence:
+              - service: switch.turn_off
+                target: { entity_id: switch.ss_solar_export }
+          - conditions: "{{ states('sensor.the_cullens_feed_in_price') | float(999) > 0 }}"
+            sequence:
+              - choose:
+                  - conditions: "{{ states('input_select.system_state') in ['2: Excess Solar to Grid', '3: Max Export (Dump)'] }}"
+                    sequence:
+                      - service: switch.turn_on
+                        target: { entity_id: switch.ss_solar_export }
+
+  # --- EV AUTOMATIONS ---
+  - alias: "EV: Solar Priority Tracking Loop"
+    description: "Actively surfs grid and battery surplus with a 200W buffer, bounds by 9,500W limit"
+    mode: single
+    trigger:
+      - platform: time_pattern
+        seconds: "/15"
+    condition:
+      - condition: state
+        entity_id: input_select.system_state
+        state: "Auto Mode"
+      - condition: state
+        entity_id: input_select.ev_charging_mode
+        state: "Excess Solar Only"
+      - condition: template
+        value_template: >
+          {{ states('sensor.smappee_ev_5130018050_connector_1_evse_status') | lower not in ['unplugged', 'unavailable', 'unknown', 'none'] }}
+    action:
+      - variables:
+          current_amps: "{{ states('number.smappee_ev_5130018050_max_charging_speed_1') | int(6) }}"
+          grid_power: "{{ states('sensor.grid_power_corrected') | float(0) }}"
+          batt_power: "{{ states('sensor.ss_battery_power') | float(0) }}"
+          total_ac_load: "{{ states('sensor.ss_total_load_power') | float(0) }}"
+          
+          # 1. System Surplus Math
+          # Negative Grid = Export. Negative Batt = Charging
+          net_surplus_watts: "{{ (-1 * grid_power) - (batt_power * 0.96) }}"
+          
+          # Subtract 200W buffer to absorb cloud/inverter lag
+          available_change_watts: "{{ net_surplus_watts - 200 }}"
+          
+          # Convert to Amps (floor it to be safe on the way up, ceil it to be aggressive on the way down)
+          amp_adj: >
+            {% if available_change_watts > 0 %}
+              {{ (available_change_watts / 235) | round(0, 'floor') | int }}
+            {% else %}
+              {{ (available_change_watts / 235) | round(0, 'ceil') | int }}
+            {% endif %}
+            
+          # 2. Inverter Ceiling Math (9,500W limit)
+          headroom_watts: "{{ 9500 - total_ac_load }}"
+          headroom_amps: "{{ (headroom_watts / 235) | int }}"
+          
+          # 3. Calculate Target (Clamp against both the grid/battery surplus and inverter ceiling)
+          raw_target: "{{ current_amps + amp_adj }}"
+          ceiling_target: >
+            {% set max_allowed = current_amps + headroom_amps %}
+            {{ [raw_target, max_allowed] | min }}
+            
+          # 4. Final safety clamp between 0A and 32A
+          target_amps: "{{ [0, [ceiling_target | int, 32] | min] | max }}"
+
+      - choose:
+          # NOT ENOUGH SOLAR OR INVERTER LIMIT HIT: Pause charger ONLY if it is currently charging. 
+          - conditions: "{{ target_amps < 6 }}"
+            sequence:
+              - choose:
+                  - conditions: "{{ states('sensor.smappee_ev_5130018050_connector_1_evse_status') | lower == 'charging' }}"
+                    sequence:
+                      - service: button.press
+                        target: { entity_id: button.smappee_ev_5130018050_pause_charging_1 }
+                        
+          # ENOUGH SOLAR: Set amps and start
+          - conditions: "{{ target_amps >= 6 }}"
+            sequence:
+              - if:
+                  - condition: template
+                    value_template: "{{ current_amps != target_amps }}"
+                then:
+                  - service: number.set_value
+                    target: { entity_id: number.smappee_ev_5130018050_max_charging_speed_1 }
+                    data: { value: "{{ target_amps }}" }
+              - choose:
+                  - conditions: "{{ states('sensor.smappee_ev_5130018050_connector_1_evse_status') | lower != 'charging' }}"
+                    sequence:
+                      - service: button.press
+                        target: { entity_id: button.smappee_ev_5130018050_start_charging_1 }
+
+  - alias: "EV: Standard Modes Safety Tracking Loop"
+    description: "Sets charge speed dynamically to protect 9,500W limit, even in Full Speed mode."
+    mode: single
+    trigger:
+      - platform: time_pattern
+        seconds: "/15"
+      - platform: state
+        entity_id: input_select.ev_charging_mode
+    condition:
+      - condition: template
+        value_template: >
+          {{ states('input_select.ev_charging_mode') in ['Full Speed (Protect Battery)', 'Standard Charge'] }}
+      - condition: template
+        value_template: >
+          {{ states('sensor.smappee_ev_5130018050_connector_1_evse_status') | lower not in ['unplugged', 'unavailable', 'unknown', 'none'] }}
+    action:
+      - variables:
+          current_amps: "{{ states('number.smappee_ev_5130018050_max_charging_speed_1') | int(6) }}"
+          total_ac_load: "{{ states('sensor.ss_total_load_power') | float(0) }}"
+          headroom_watts: "{{ 9500 - total_ac_load }}"
+          headroom_amps: "{{ (headroom_watts / 235) | int }}"
+          target_amps: >
+            {% set max_allowed = current_amps + headroom_amps %}
+            {{ [0, [max_allowed, 32] | min] | max }}
+            
+      - choose:
+          # HOUSE LOAD EXCEEDED INVERTER LIMIT: Less than 6 Amps left. Pause the charger.
+          - conditions: "{{ target_amps < 6 }}"
+            sequence:
+              - choose:
+                  - conditions: "{{ states('sensor.smappee_ev_5130018050_connector_1_evse_status') | lower == 'charging' }}"
+                    sequence:
+                      - service: button.press
+                        target: { entity_id: button.smappee_ev_5130018050_pause_charging_1 }
+                        
+          # SAFE TO CHARGE: Run up to 32A, bounded by 9,500W limit.
+          - conditions: "{{ target_amps >= 6 }}"
+            sequence:
+              - if:
+                  - condition: template
+                    value_template: "{{ current_amps != target_amps }}"
+                then:
+                  - service: number.set_value
+                    target: { entity_id: number.smappee_ev_5130018050_max_charging_speed_1 }
+                    data: { value: "{{ target_amps }}" }
+              - choose:
+                  - conditions: "{{ states('sensor.smappee_ev_5130018050_connector_1_evse_status') | lower != 'charging' }}"
+                    sequence:
+                      - service: button.press
+                        target: { entity_id: button.smappee_ev_5130018050_start_charging_1 }
+
+  - alias: "EV: Battery Hold Ratchet (Update Capacity if Increased)"
+    description: "Actively walks the capacity lock up if the sun charges the battery during EV charging"
+    trigger:
+      - platform: time_pattern
+        seconds: "/15"
+    condition:
+      - condition: state
+        entity_id: input_select.system_state
+        state: "Auto Mode"
+      - condition: template
+        value_template: "{{ states('sensor.smappee_ev_5130018050_connector_1_evse_status') | lower == 'charging' }}"
+      - condition: template
+        value_template: "{{ states('input_select.ev_charging_mode') in ['Excess Solar Only', 'Full Speed (Protect Battery)'] }}"
+    action:
+      - if:
+          - condition: template
+            value_template: "{{ states('sensor.current_battery_soc') | int > states('number.ss_prog1_capacity') | int }}"
+        then:
+          - repeat:
+              for_each: [1, 2, 3, 4, 5, 6]
+              sequence:
+                - service: number.set_value
+                  target: { entity_id: "number.ss_prog{{ repeat.item }}_capacity" }
+                  data: { value: "{{ states('sensor.current_battery_soc') | int }}" }
+
+  # --- AMBER TIERED AUTO TRADING (BACKGROUND) ---
+  - alias: "Amber: Tiered Auto Trading"
+    description: "Evaluates EV status and Amber pricing to puppet the Deye Inverter"
+    mode: queued
+    trigger:
+      - platform: state
+        entity_id: sensor.the_cullens_feed_in_price
+      - platform: state
+        entity_id: sensor.amber_general_price
+      - platform: state
+        entity_id: sensor.current_battery_soc
+      - platform: state
+        entity_id: sensor.smappee_ev_5130018050_connector_1_evse_status
+      - platform: state
+        entity_id: input_select.system_state
+        to: "Auto Mode"
+      - platform: state
+        entity_id: input_boolean.rules_active
+        to: "on"
+      - platform: state
+        entity_id: input_select.ev_charging_mode
+    condition:
+      - condition: state
+        entity_id: input_boolean.rules_active
+        state: "on"
+      - condition: state
+        entity_id: input_select.system_state
+        state: "Auto Mode"
+    action:
+      - variables:
+          price: "{{ states('sensor.the_cullens_feed_in_price') | float(0) }}"
+          buy_price: "{{ states('sensor.amber_general_price') | float(0) }}"
+          soc: "{{ states('sensor.current_battery_soc') | int(0) }}"
+          t3_price: "{{ states('input_number.auto_dump_fit_threshold_tier3') | float(0) }}"
+          t3_soc: "{{ states('input_number.auto_dump_min_soc_tier3') | int(0) }}"
+          t2_price: "{{ states('input_number.auto_dump_fit_threshold_tier2') | float(0) }}"
+          t2_soc: "{{ states('input_number.auto_dump_min_soc_tier2') | int(0) }}"
+          t1_price: "{{ states('input_number.auto_dump_fit_threshold_tier1') | float(0) }}"
+          t1_soc: "{{ states('input_number.auto_dump_min_soc_tier1') | int(0) }}"
+          
+      - choose:
+          # PRIORITY 1: THE KINGS (EV IS ACTIVELY CHARGING)
+          - conditions: "{{ states('sensor.smappee_ev_5130018050_connector_1_evse_status') | lower == 'charging' }}"
+            sequence:
+              - choose:
+                  # EV Mode 1 & 2: Lock the House Battery 
+                  - conditions: "{{ states('input_select.ev_charging_mode') in ['Excess Solar Only', 'Full Speed (Protect Battery)'] }}"
+                    sequence:
+                      - service: switch.turn_off
+                        target: { entity_id: switch.ss_solar_export }
+                      - service: switch.turn_off
+                        target: { entity_id: switch.ss_grid_charge_enabled }
+                      - service: select.select_option
+                        target: { entity_id: select.ss_load_limit }
+                        data: { option: "Zero Export" }
+                      - variables:
+                          target_soc: "{{ [states('sensor.current_battery_soc')|int(0), states('number.ss_prog1_capacity')|int(0)] | max | int }}"
+                      - repeat:
+                          for_each: [1, 2, 3, 4, 5, 6]
+                          sequence:
+                            - service: select.select_option
+                              target: { entity_id: "select.ss_prog{{ repeat.item }}_charge" }
+                              data: { option: "No Grid or Gen" }
+                            - service: number.set_value
+                              target: { entity_id: "number.ss_prog{{ repeat.item }}_capacity" }
+                              data: { value: "{{ target_soc }}" }
+                          
+                  # EV Mode 3: Standard Charge
+                  - conditions: "{{ states('input_select.ev_charging_mode') == 'Standard Charge' }}"
+                    sequence:
+                      - service: switch.turn_off
+                        target: { entity_id: switch.ss_solar_export }
+                      - service: switch.turn_off
+                        target: { entity_id: switch.ss_grid_charge_enabled }
+                      - service: select.select_option
+                        target: { entity_id: select.ss_load_limit }
+                        data: { option: "Zero Export" }
+                      - repeat:
+                          for_each: [1, 2, 3, 4, 5, 6]
+                          sequence:
+                            - service: select.select_option
+                              target: { entity_id: "select.ss_prog{{ repeat.item }}_charge" }
+                              data: { option: "No Grid or Gen" }
+                            - service: number.set_value
+                              target: { entity_id: "number.ss_prog{{ repeat.item }}_capacity" }
+                              data: { value: 5 }
+
+          # PRIORITY 2: TIER 3 PRICE BRACKET
+          - conditions: "{{ price >= t3_price }}"
+            sequence:
+              - choose:
+                  - conditions: "{{ soc > t3_soc }}"
+                    sequence:
+                      - service: switch.turn_on
+                        target: { entity_id: switch.ss_solar_export }
+                      - service: switch.turn_off
+                        target: { entity_id: switch.ss_grid_charge_enabled }
+                      - service: select.select_option
+                        target: { entity_id: select.ss_load_limit }
+                        data: { option: "Allow Export" }
+                      - repeat:
+                          for_each: [1, 2, 3, 4, 5, 6]
+                          sequence:
+                            - service: select.select_option
+                              target: { entity_id: "select.ss_prog{{ repeat.item }}_charge" }
+                              data: { option: "No Grid or Gen" }
+                            - service: number.set_value
+                              target: { entity_id: "number.ss_prog{{ repeat.item }}_capacity" }
+                              data: { value: 5 }
+                default:
+                  - service: switch.turn_on
+                    target: { entity_id: switch.ss_solar_export }
+                  - service: switch.turn_off
+                    target: { entity_id: switch.ss_grid_charge_enabled }
+                  - service: select.select_option
+                    target: { entity_id: select.ss_load_limit }
+                    data: { option: "Zero Export" }
+                  - repeat:
+                      for_each: [1, 2, 3, 4, 5, 6]
+                      sequence:
+                        - service: select.select_option
+                          target: { entity_id: "select.ss_prog{{ repeat.item }}_charge" }
+                          data: { option: "No Grid or Gen" }
+                        - service: number.set_value
+                          target: { entity_id: "number.ss_prog{{ repeat.item }}_capacity" }
+                          data: { value: 5 }
+
+          # PRIORITY 3: TIER 2 PRICE BRACKET
+          - conditions: "{{ price >= t2_price }}"
+            sequence:
+              - choose:
+                  - conditions: "{{ soc > t2_soc }}"
+                    sequence:
+                      - service: switch.turn_on
+                        target: { entity_id: switch.ss_solar_export }
+                      - service: switch.turn_off
+                        target: { entity_id: switch.ss_grid_charge_enabled }
+                      - service: select.select_option
+                        target: { entity_id: select.ss_load_limit }
+                        data: { option: "Allow Export" }
+                      - repeat:
+                          for_each: [1, 2, 3, 4, 5, 6]
+                          sequence:
+                            - service: select.select_option
+                              target: { entity_id: "select.ss_prog{{ repeat.item }}_charge" }
+                              data: { option: "No Grid or Gen" }
+                            - service: number.set_value
+                              target: { entity_id: "number.ss_prog{{ repeat.item }}_capacity" }
+                              data: { value: 5 }
+                default:
+                  - service: switch.turn_on
+                    target: { entity_id: switch.ss_solar_export }
+                  - service: switch.turn_off
+                    target: { entity_id: switch.ss_grid_charge_enabled }
+                  - service: select.select_option
+                    target: { entity_id: select.ss_load_limit }
+                    data: { option: "Zero Export" }
+                  - repeat:
+                      for_each: [1, 2, 3, 4, 5, 6]
+                      sequence:
+                        - service: select.select_option
+                          target: { entity_id: "select.ss_prog{{ repeat.item }}_charge" }
+                          data: { option: "No Grid or Gen" }
+                        - service: number.set_value
+                          target: { entity_id: "number.ss_prog{{ repeat.item }}_capacity" }
+                          data: { value: 5 }
+
+          # PRIORITY 4: TIER 1 PRICE BRACKET
+          - conditions: "{{ price >= t1_price }}"
+            sequence:
+              - choose:
+                  - conditions: "{{ soc > t1_soc }}"
+                    sequence:
+                      - service: switch.turn_on
+                        target: { entity_id: switch.ss_solar_export }
+                      - service: switch.turn_off
+                        target: { entity_id: switch.ss_grid_charge_enabled }
+                      - service: select.select_option
+                        target: { entity_id: select.ss_load_limit }
+                        data: { option: "Allow Export" }
+                      - repeat:
+                          for_each: [1, 2, 3, 4, 5, 6]
+                          sequence:
+                            - service: select.select_option
+                              target: { entity_id: "select.ss_prog{{ repeat.item }}_charge" }
+                              data: { option: "No Grid or Gen" }
+                            - service: number.set_value
+                              target: { entity_id: "number.ss_prog{{ repeat.item }}_capacity" }
+                              data: { value: 5 }
+                default:
+                  - service: switch.turn_on
+                    target: { entity_id: switch.ss_solar_export }
+                  - service: switch.turn_off
+                    target: { entity_id: switch.ss_grid_charge_enabled }
+                  - service: select.select_option
+                    target: { entity_id: select.ss_load_limit }
+                    data: { option: "Zero Export" }
+                  - repeat:
+                      for_each: [1, 2, 3, 4, 5, 6]
+                      sequence:
+                        - service: select.select_option
+                          target: { entity_id: "select.ss_prog{{ repeat.item }}_charge" }
+                          data: { option: "No Grid or Gen" }
+                        - service: number.set_value
+                          target: { entity_id: "number.ss_prog{{ repeat.item }}_capacity" }
+                          data: { value: 5 }
+
+          # PRIORITY 5: NEGATIVE BUY PRICE
+          - conditions: "{{ is_state('input_boolean.auto_grid_charge_negative_buy', 'on') and buy_price < 0 }}"
+            sequence:
+              - service: switch.turn_on
+                target: { entity_id: switch.ss_grid_charge_enabled }
+              - service: switch.turn_off
+                target: { entity_id: switch.ss_solar_export }
+              - service: select.select_option
+                target: { entity_id: select.ss_load_limit }
+                data: { option: "Zero Export" }
+              - repeat:
+                  for_each: [1, 2, 3, 4, 5, 6]
+                  sequence:
+                    - service: select.select_option
+                      target: { entity_id: "select.ss_prog{{ repeat.item }}_charge" }
+                      data: { option: "Allow Grid" }
+                    - service: number.set_value
+                      target: { entity_id: "number.ss_prog{{ repeat.item }}_capacity" }
+                      data: { value: 100 }
+
+          # PRIORITY 6: NEGATIVE FIT (STOP EXPORT)
+          - conditions: "{{ is_state('input_boolean.auto_zero_export_negative_fit', 'on') and price < 0 }}"
+            sequence:
+              - service: switch.turn_off
+                target: { entity_id: switch.ss_solar_export }
+              - service: switch.turn_off
+                target: { entity_id: switch.ss_grid_charge_enabled }
+              - service: select.select_option
+                target: { entity_id: select.ss_load_limit }
+                data: { option: "Zero Export" }
+              - repeat:
+                  for_each: [1, 2, 3, 4, 5, 6]
+                  sequence:
+                    - service: select.select_option
+                      target: { entity_id: "select.ss_prog{{ repeat.item }}_charge" }
+                      data: { option: "No Grid or Gen" }
+                    - service: number.set_value
+                      target: { entity_id: "number.ss_prog{{ repeat.item }}_capacity" }
+                      data: { value: 5 }
+
+        # DEFAULT FALLBACK (Prices are normal, EV is not charging -> Excess Solar to Grid)
+        default:
+          - service: switch.turn_on
+            target: { entity_id: switch.ss_solar_export }
+          - service: switch.turn_off
+            target: { entity_id: switch.ss_grid_charge_enabled }
+          - service: select.select_option
+            target: { entity_id: select.ss_load_limit }
+            data: { option: "Zero Export" }
+          - repeat:
+              for_each: [1, 2, 3, 4, 5, 6]
+              sequence:
+                - service: select.select_option
+                  target: { entity_id: "select.ss_prog{{ repeat.item }}_charge" }
+                  data: { option: "No Grid or Gen" }
+                - service: number.set_value
+                  target: { entity_id: "number.ss_prog{{ repeat.item }}_capacity" }
+                  data: { value: 5 }
+
+  # --- MANUAL OVERRIDE (Runs ONLY if Dropdown is manually changed from Auto) ---
+  - alias: "Deye: Manual System State Control"
+    description: "Sets Deye Modbus registers based on dropdown selection"
+    trigger:
+      - platform: state
+        entity_id: input_select.system_state
+    condition:
+      - condition: template
+        value_template: "{{ trigger.to_state.state != 'Auto Mode' }}"
+    action:
+      - choose:
+          - conditions: "{{ trigger.to_state.state == '2: Excess Solar to Grid' }}"
+            sequence:
+              - service: switch.turn_on
+                target: { entity_id: switch.ss_solar_export }
+              - service: switch.turn_off
+                target: { entity_id: switch.ss_grid_charge_enabled }
+              - service: select.select_option
+                target: { entity_id: select.ss_load_limit }
+                data: { option: "Zero Export" }
+              - repeat:
+                  for_each: [1, 2, 3, 4, 5, 6]
+                  sequence:
+                    - service: select.select_option
+                      target: { entity_id: "select.ss_prog{{ repeat.item }}_charge" }
+                      data: { option: "No Grid or Gen" }
+                    - service: number.set_value
+                      target: { entity_id: "number.ss_prog{{ repeat.item }}_capacity" }
+                      data: { value: 5 }
+
+          - conditions: "{{ trigger.to_state.state == '3: Max Export (Dump)' }}"
+            sequence:
+              - service: switch.turn_on
+                target: { entity_id: switch.ss_solar_export }
+              - service: switch.turn_off
+                target: { entity_id: switch.ss_grid_charge_enabled }
+              - service: select.select_option
+                target: { entity_id: select.ss_load_limit }
+                data: { option: "Allow Export" }
+              - repeat:
+                  for_each: [1, 2, 3, 4, 5, 6]
+                  sequence:
+                    - service: select.select_option
+                      target: { entity_id: "select.ss_prog{{ repeat.item }}_charge" }
+                      data: { option: "No Grid or Gen" }
+                    - service: number.set_value
+                      target: { entity_id: "number.ss_prog{{ repeat.item }}_capacity" }
+                      data: { value: 5 }
+
+          - conditions: "{{ trigger.to_state.state == '4: Self Consumption' }}"
+            sequence:
+              - service: switch.turn_off
+                target: { entity_id: switch.ss_solar_export }
+              - service: switch.turn_off
+                target: { entity_id: switch.ss_grid_charge_enabled }
+              - service: select.select_option
+                target: { entity_id: select.ss_load_limit }
+                data: { option: "Zero Export" }
+              - repeat:
+                  for_each: [1, 2, 3, 4, 5, 6]
+                  sequence:
+                    - service: select.select_option
+                      target: { entity_id: "select.ss_prog{{ repeat.item }}_charge" }
+                      data: { option: "No Grid or Gen" }
+                    - service: number.set_value
+                      target: { entity_id: "number.ss_prog{{ repeat.item }}_capacity" }
+                      data: { value: 5 }
+
+          - conditions: "{{ trigger.to_state.state == '5: Grid Charge (Force)' }}"
+            sequence:
+              - service: switch.turn_on
+                target: { entity_id: switch.ss_grid_charge_enabled }
+              - service: switch.turn_off
+                target: { entity_id: switch.ss_solar_export }
+              - service: select.select_option
+                target: { entity_id: select.ss_load_limit }
+                data: { option: "Zero Export" }
+              - repeat:
+                  for_each: [1, 2, 3, 4, 5, 6]
+                  sequence:
+                    - service: select.select_option
+                      target: { entity_id: "select.ss_prog{{ repeat.item }}_charge" }
+                      data: { option: "Allow Grid" }
+                    - service: number.set_value
+                      target: { entity_id: "number.ss_prog{{ repeat.item }}_capacity" }
+                      data: { value: 100 }
