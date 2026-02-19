@@ -1,0 +1,107 @@
+views:
+  - title: Amber Control
+    path: amber-control
+    icon: mdi:home-lightning-bolt
+    cards:
+      - type: horizontal-stack
+        cards:
+          - type: custom:mushroom-chips-card
+            chips:
+              - type: entity
+                entity: sensor.the_tauchers_home_general_price
+                icon: mdi:currency-usd
+                name: Buy Price
+                content_info: state
+                icon_color: >-
+                  {% set price =
+                  states('sensor.the_tauchers_home_general_price') | float(0) %}
+                  {% if price < 0 %} cyan  {% elif price < 0.19 %} green  {%
+                  elif price < 0.40 %} orange  {% else %} red {% endif %}
+              - type: entity
+                entity: sensor.the_tauchers_home_feed_in_price
+                icon: mdi:solar-power
+                name: Sell Price
+                content_info: state
+                icon_color: >-
+                  {% set price =
+                  states('sensor.the_tauchers_home_feed_in_price') | float(0) %}
+                  {% if price < 0 %} red  {% elif price < 0.06 %} orange  {%
+                  else %} green {% endif %}
+          - type: custom:mushroom-chips-card
+            alignment: end
+            chips:
+              - type: entity
+                entity: sensor.battery_level
+                icon: mdi:battery-high
+                icon_color: >-
+                  {% set level = states('sensor.battery_level') | float(0) %} 
+                  {% if level < 20 %} red  {% elif level < 50 %} orange  {% else
+                  %} green {% endif %}
+                content_info: state
+
+      - type: custom:power-flow-card-plus
+        name: System Status
+        entities:
+          grid:
+            entity: sensor.grid_net_power
+            name: Grid
+            invert_state: false
+            color_circle: true
+          solar:
+            entity: sensor.total_dc_power
+            name: Solar
+            display_zero_state: true
+          battery:
+            entity: sensor.battery_net_power
+            name: Battery
+            state_of_charge: sensor.battery_level
+            invert_state: false
+          home:
+            entity: sensor.load_power
+            name: House
+        clickable_entities: true
+        display_zero_lines: true
+        use_new_flow_rate_model: true
+        w_decimals: 0
+        kw_decimals: 1
+        min_flow_rate: 3
+        max_flow_rate: 6
+
+      - type: custom:mushroom-title-card
+        title: Master Control
+        subtitle: Select trading mode or manual override
+      - type: entities
+        entities:
+          - entity: input_select.system_state
+            name: Inverter Mode
+          - entity: input_select.ev_charging_mode
+            name: EV Charging Mode
+
+      - type: custom:mushroom-title-card
+        title: Auto Mode Parameters
+        subtitle: Rules apply only when 'Auto Mode' is selected above
+      - type: entities
+        show_header_toggle: false
+        entities:
+          - type: section
+            label: 💰 Auto-Charge (Negative Buy Price)
+          - entity: input_boolean.auto_grid_charge_negative_buy
+            name: Charge from grid if buy price is < $0.00
+          - type: section
+            label: 🚀 Auto-Discharge (Price Spikes)
+          - entity: input_number.auto_dump_fit_threshold_tier1
+            name: Tier 1 - Trigger Dump FiT ($)
+          - entity: input_number.auto_dump_min_soc_tier1
+            name: Tier 1 - Stop Dumping at SoC (%)
+          - entity: input_number.auto_dump_fit_threshold_tier2
+            name: Tier 2 - Trigger Dump FiT ($)
+          - entity: input_number.auto_dump_min_soc_tier2
+            name: Tier 2 - Stop Dumping at SoC (%)
+          - entity: input_number.auto_dump_fit_threshold_tier3
+            name: Tier 3 - Trigger Dump FiT ($)
+          - entity: input_number.auto_dump_min_soc_tier3
+            name: Tier 3 - Stop Dumping at SoC (%)
+          - type: section
+            label: 🛑 Solar Curtailment (Negative Feed-in)
+          - entity: input_boolean.auto_zero_export_negative_fit
+            name: Stop exporting if feed-in is < $0.00
