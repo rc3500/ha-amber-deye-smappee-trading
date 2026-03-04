@@ -8,27 +8,21 @@ This package orchestrates wholesale energy trading (Amber Electric Australia) wi
 * **Energy Provider:** Amber Electric (Wholesale real-time pricing)
 * **Inverter:** Deye Hybrid Inverter (SUN-10K-SG04LP3-AU)
 * **Battery:** 12x AI-W5.1-B (61.44kWh Total)
-* **Connectivity:** RS485 to Ethernet (Modbus TCP)
 * **EV Charger:** Smappee EV Wallbox
 * **Vehicle:** Polestar 2
 
 ## Key Features
 
 ### 📈 Tiered Battery Dumping
-Uses three adjustable tiers to manage grid exports during price spikes.
-* Set a trigger **Sell Price** and a **Stop Dumping** SoC floor for each tier.
+* Manages grid exports during price spikes using three adjustable tiers.
 * The system dynamically toggles the Deye inverter between 'Allow Export' and 'Zero Export' based on real-time wholesale feed-in tariffs.
 
-### 🛑 Automated Safeguards
-* **Negative Buy Protection:** Automatically charges the home battery from the grid if the wholesale price drops below $0.00.
-* **Solar Curtailment:** If the battery is full and feed-in prices turn negative, the system forces 'Zero Export' to ensure you don't pay to provide energy to the grid.
-
-### 🚗 Smart EV Integration
+### 🚗 Smart EV Integration & Dynamic Battery Protection
 The system uses a **Closed-Loop Grid Zeroing Algorithm** to track available solar every 15 seconds.
-$$Net Surplus = (-1 \times Grid Power) - (Battery Power \times 0.96)$$
-* **Excess Solar Only:** Surfs the grid meter to charge purely from surplus. Includes a 200W buffer to handle inverter lag and cloud cover.
-* **Full Speed (Protect Battery):** Charges at max speed (up to 32A/9.5kW) while ensuring the home battery stays above a user-defined SoC floor.
-* **Standard Charge:** Charges at full speed, allowing the home battery to assist.
+* **No Manual Locking Required:** The system no longer requires you to manually lock battery states.
+* **Automatic Reserve Management:** The backend automatically calculates and maintains battery floors based on your `Min Battery Reserve` setting and active charging mode.
+* **Excess Solar Only:** Surfs the grid meter to charge purely from surplus with a 200W safety buffer.
+* **Full Speed (Protect Battery):** Charges at max speed while ensuring the home battery stays above your user-defined SoC floor.
 
 ## Installation
 
@@ -38,10 +32,5 @@ $$Net Surplus = (-1 \times Grid Power) - (Battery Power \times 0.96)$$
 3. Verify your grid power and battery power sensors match the naming convention in the template sensors.
 
 ### 2. Frontend Setup
-Install the following via HACS:
-* Mushroom Cards
-* Power Flow Card Plus
-* Plotly Graph Card
-* ApexCharts Card
-
+Install the following via HACS: Mushroom Cards, Power Flow Card Plus, Plotly Graph Card, and ApexCharts Card.
 Paste the contents of `dashboard.yaml` into a new dashboard (Raw Configuration Editor).
