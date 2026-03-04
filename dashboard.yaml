@@ -247,17 +247,17 @@ views:
             icon: mdi:chart-bell-curve
             icon_color: purple
           - type: custom:mushroom-entity-card
-            entity: sensor.the_cullens_feed_in_price
+            entity: sensor.amber_feed_in_price
             name: Feed In Price
             icon: mdi:solar-power
             icon_color: yellow
           - type: custom:mushroom-entity-card
-            entity: sensor.the_cullens_feed_in_price_descriptor
+            entity: sensor.amber_feed_in_price_descriptor
             name: Feed In Status
             icon: mdi:tag-text-outline
             icon_color: blue
           - type: custom:mushroom-entity-card
-            entity: sensor.the_cullens_feed_in_forecast
+            entity: sensor.amber_feed_in_forecast
             name: Feed In Forecast
             icon: mdi:chart-bell-curve
             icon_color: purple
@@ -494,13 +494,13 @@ views:
                   return entity.attributes.forecasts.map((entry) => {
                     return [new Date(entry.start_time).getTime(), entry.per_kwh];
                   });
-              - entity: sensor.the_cullens_feed_in_price
+              - entity: sensor.amber_feed_in_price
                 name: Sell Price (FiT)
                 type: line
                 curve: stepline
                 color: '#f1c40f'
                 extend_to: now
-              - entity: sensor.the_cullens_feed_in_forecast
+              - entity: sensor.amber_feed_in_forecast
                 name: Sell Forecast
                 type: line
                 curve: stepline
@@ -550,12 +550,12 @@ views:
                         xs: meta.forecasts.map(({ start_time }) => new Date(start_time)),
                         ys: meta.forecasts.map(({ per_kwh }) => per_kwh),
                       })
-              - entity: sensor.the_cullens_feed_in_price
+              - entity: sensor.amber_feed_in_price
                 name: Sell History
                 line:
                   color: '#f1c40f'
                   shape: hv
-              - entity: sensor.the_cullens_feed_in_forecast
+              - entity: sensor.amber_feed_in_forecast
                 name: Sell Forecast
                 show_value: false
                 line:
