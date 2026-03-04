@@ -34,7 +34,7 @@ $$Net Surplus = (-1 \times Grid Power) - (Battery Power \times 0.96)$$
 
 ### 1. Backend Setup
 1. Place `energy_trading.yaml` in your Home Assistant `packages/` folder.
-2. Search and replace the Smappee serial `5130018050` with your own.
+2. Search and replace the Smappee serial with your own.
 3. Verify your grid power and battery power sensors match the naming convention in the template sensors.
 
 ### 2. Frontend Setup
