@@ -1,0 +1,106 @@
+DRIVER: pymodbus
+INVERTERS:
+  - SERIAL_NR: "**********" #add your inverter serial number here. Replace "*"
+    HA_PREFIX: Sunsynk
+    MODBUS_ID: 1
+    PORT: tcp://***.***.***.***:502 #add your inverter or modbus rtu to modbus tcp adapter IP address here. 502 is the port. Feel free to change this if required.
+SENSOR_DEFINITIONS: single-phase
+SENSORS:
+  - energy_flow_card
+  - battery_temperature
+  - battery_voltage
+  - battery_soc
+  - battery_power
+  - battery_current
+  - inverter_power
+  - inverter_voltage
+  - inverter_frequency
+  - grid_frequency
+  - grid_power
+  - grid_voltage
+  - grid_current
+  - grid_ct_power
+  - load_power
+  - load_frequency
+  - pv1_power
+  - pv1_voltage
+  - pv1_current
+  - pv2_power
+  - pv2_voltage
+  - pv2_current
+  - pv3_power
+  - pv3_voltage
+  - pv3_current
+  - aux_power
+  - day_battery_charge
+  - day_battery_discharge
+  - day_grid_export
+  - day_grid_import
+  - day_load_energy
+  - day_pv_energy
+  - total_battery_charge
+  - total_battery_discharge
+  - total_grid_export
+  - total_grid_import
+  - total_load_energy
+  - total_pv_energy
+SENSORS_FIRST_INVERTER:
+  - use_timer
+  - grid_charge_enabled
+  - load_limit
+  - priority_load
+  - prog1_capacity
+  - prog1_charge
+  - prog1_power
+  - prog1_time
+  - prog2_capacity
+  - prog2_charge
+  - prog2_power
+  - prog2_time
+  - prog3_capacity
+  - prog3_charge
+  - prog3_power
+  - prog3_time
+  - prog4_capacity
+  - prog4_charge
+  - prog4_power
+  - prog4_time
+  - prog5_capacity
+  - prog5_charge
+  - prog5_power
+  - prog5_time
+  - prog6_capacity
+  - prog6_charge
+  - prog6_power
+  - prog6_time
+  - solar_export
+  - battery_low_capacity
+  - battery_shutdown_capacity
+  - rated_power
+MANUFACTURER: Sunsynk
+READ_ALLOW_GAP: 2
+READ_SENSORS_BATCH_SIZE: 5
+SCHEDULES:
+  - KEY: rw
+    READ_EVERY: 2
+    REPORT_EVERY: 2
+    CHANGE_ANY: true
+  - KEY: W
+    READ_EVERY: 2
+    REPORT_EVERY: 2
+    CHANGE_ANY: false
+    CHANGE_PERCENT: 0
+  - KEY: KWH
+    READ_EVERY: 10
+    REPORT_EVERY: 60
+  - KEY: any_unit
+    READ_EVERY: 5
+    REPORT_EVERY: 5
+NUMBER_ENTITY_MODE: auto
+PROG_TIME_INTERVAL: "15"
+DEBUG: 0
+DEBUG_DEVICE: /dev/ttyS0
+MQTT_HOST: core-mosquitto
+MQTT_PORT: 1883
+MQTT_USERNAME: *** # This is optional. You don't have to set an MQTT username
+MQTT_PASSWORD: *** # This is optional. You don't have to set an MQTT password
